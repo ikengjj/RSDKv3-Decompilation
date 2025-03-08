@@ -2,20 +2,20 @@
 #include <string>
 
 int currentVideoFrame = 0;
-int videoFrameCount   = 0;
-int videoWidth        = 0;
-int videoHeight       = 0;
-float videoAR         = 0;
+int videoFrameCount = 0;
+int videoWidth = 0;
+int videoHeight = 0;
+float videoAR = 0;
 
 THEORAPLAY_Decoder *videoDecoder;
 const THEORAPLAY_VideoFrame *videoVidData;
 THEORAPLAY_Io callbacks;
 
 byte videoSurface = 0;
-int videoFilePos  = 0;
-int videoPlaying  = 0;
-int vidFrameMS    = 0;
-int vidBaseticks  = 0;
+int videoFilePos = 0;
+int videoPlaying = 0;
+int vidFrameMS = 0;
+int vidBaseTicks = 0;
 
 bool videoSkipped = false;
 
@@ -34,8 +34,7 @@ static void videoClose(THEORAPLAY_Io *io)
     fClose(file);
 }
 
-void PlayVideoFile(char *filePath)
-{
+void PlayVideoFile(char *filePath) {
     char pathBuffer[0x100];
     int len = StrLength(filePath);
 
@@ -61,7 +60,6 @@ void PlayVideoFile(char *filePath)
             std::map<std::string, std::string>::const_iterator iter = modList[m].fileMap.find(pathLower);
             if (iter != modList[m].fileMap.cend()) {
                 StrCopy(pathBuffer, iter->second.c_str());
-                Engine.forceFolder   = true;
                 Engine.usingDataFile = false;
                 addPath              = false;
                 break;
@@ -100,17 +98,22 @@ void PlayVideoFile(char *filePath)
         callbacks.read     = videoRead;
         callbacks.close    = videoClose;
         callbacks.userdata = (void *)file;
+
+        // TODO
+        // perhaps implement multi audio stream support? (e.g. sonic cd cutscenes)
 #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV);
 #endif
 
         // TODO: does SDL1.2 support YUV?
 #if RETRO_USING_SDL1 && !RETRO_USING_OPENGL
-        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+        //videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+        videoDecoder = THEORAPLAY_startDecodeFile(filepath, 30, THEORAPLAY_VIDFMT_IYUV);
 #endif
 
 #if RETRO_USING_OPENGL
-        videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+        //videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+        videoDecoder = THEORAPLAY_startDecodeFile(filepath, 30, THEORAPLAY_VIDFMT_RGBA);
 #endif
 
         if (!videoDecoder) {
@@ -132,7 +135,7 @@ void PlayVideoFile(char *filePath)
         videoAR = float(videoWidth) / float(videoHeight);
 
         SetupVideoBuffer(videoWidth, videoHeight);
-        vidBaseticks = SDL_GetTicks();
+        vidBaseTicks = SDL_GetTicks();
         vidFrameMS   = (videoVidData->fps == 0.0) ? 0 : ((Uint32)(1000.0 / videoVidData->fps));
         videoPlaying = 1; // playing ogv
         trackID      = TRACK_COUNT - 1;
@@ -200,23 +203,26 @@ void UpdateVideoFrame()
     }
 }
 
-int ProcessVideo()
-{
+int ProcessVideo() {
     if (videoPlaying == 1) {
-        CheckKeyPress(&keyPress, 0xFF);
+        CheckKeyPress(&inputPress);
 
         if (videoSkipped && fadeMode < 0xFF) {
             fadeMode += 8;
         }
 
-        if (anyPress || touches > 0) {
+        // taxman forgot the anyPress i guess
+        if (inputDevice[INPUT_BUTTONA].press || inputDevice[INPUT_BUTTONB].press || inputDevice[INPUT_BUTTONC].press || inputDevice[INPUT_BUTTONX].press || inputDevice[INPUT_BUTTONY].press || inputDevice[INPUT_BUTTONZ].press || inputDevice[INPUT_BUTTONL].press || inputDevice[INPUT_BUTTONR].press || inputDevice[INPUT_START].press || inputDevice[INPUT_SELECT].press || touches > 0) {
             if (!videoSkipped)
                 fadeMode = 0;
 
             videoSkipped = true;
         }
 
-        if (!THEORAPLAY_isDecoding(videoDecoder) || (videoSkipped && fadeMode >= 0xFF)) {
+        // ok so
+        // theoraplay is just never returning false for some reason???
+        // i hacked around this i guess, check line 237
+        if (/*!THEORAPLAY_isDecoding(videoDecoder) || */(videoSkipped && fadeMode >= 0xFF)) {
             StopVideoPlayback();
             ResumeSound();
             return 1; // video finished
@@ -224,15 +230,21 @@ int ProcessVideo()
 
         // Don't pause or it'll go wild
         if (videoPlaying == 1) {
-            const Uint32 now = (SDL_GetTicks() - vidBaseticks);
+            const Uint32 now = (SDL_GetTicks() - vidBaseTicks);
 
-            if (!videoVidData)
+            if (!videoVidData) {
                 videoVidData = THEORAPLAY_getVideo(videoDecoder);
+                // we done lmao
+                if (!videoVidData) {
+                    StopVideoPlayback();
+                    ResumeSound();
+                    return 1;
+                }
+            }
 
             // Play video frames when it's time.
             if (videoVidData && (videoVidData->playms <= now)) {
                 if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
-
                     // Skip frames to catch up, but keep track of the last one+
                     //  in case we catch up to a series of dupe frames, which
                     //  means we'd have to draw that final frame and then wait for
@@ -269,7 +281,6 @@ int ProcessVideo()
 #elif RETRO_USING_SDL1
                 memcpy(Engine.videoBuffer->pixels, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
 #endif
-
                 THEORAPLAY_freeVideo(videoVidData);
                 videoVidData = NULL;
             }
@@ -326,13 +337,16 @@ void SetupVideoBuffer(int width, int height)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
+	
+	if (!videoBuffer || !&videoBuffer || !videoVidData)
+        PrintLog("Failed to create video buffer!");
 #elif RETRO_USING_SDL1
     Engine.videoBuffer = SDL_CreateRGBSurface(0, width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 
     if (!Engine.videoBuffer)
         PrintLog("Failed to create video buffer!");
 #elif RETRO_USING_SDL2
-    Engine.videoBuffer = SDL_CreateTexture(Engine.renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STREAMING, width, height);
+    Engine.videoBuffer = SDL_CreateTexture(Engine.renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_TARGET, width, height);
 
     if (!Engine.videoBuffer)
         PrintLog("Failed to create video buffer!");

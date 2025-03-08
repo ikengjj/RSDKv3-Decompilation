@@ -1,13 +1,23 @@
 #ifndef MOD_API_H
 #define MOD_API_H
 
+#define PLAYER_COUNT (0x10)
+
+extern char playerNames[PLAYER_COUNT][0x20];
+extern byte playerCount;
+
+// These are still needed even if RETRO_USE_MOD_LOADER isn't defined
+extern bool redirectSave;
+extern char modsPath[0x100];
+extern char savePath[0x100];
+
 #if RETRO_USE_MOD_LOADER
 #include <string>
 #include <map>
 #include <unordered_map>
 #include <tinyxml2.h>
 
-#define PLAYERNAME_COUNT (0x10)
+#define PLAYER_COUNT (0x10)
 
 struct ModInfo {
     std::string name;
@@ -17,10 +27,11 @@ struct ModInfo {
     std::map<std::string, std::string> fileMap;
     std::string folder;
     bool useScripts;
+    bool skipStartMenu;
     int disableFocusPause;
     bool redirectSave;
-    bool disableSaveIniOverride;
     std::string savePath;
+    bool forceSonic1;
     bool active;
 };
 
@@ -30,14 +41,13 @@ extern int activeMod;
 extern char modsPath[0x100];
 
 extern bool redirectSave;
-extern bool disableSaveIniOverride;
 
 extern char modTypeNames[OBJECT_COUNT][0x40];
 extern char modScriptPaths[OBJECT_COUNT][0x40];
 extern byte modScriptFlags[OBJECT_COUNT];
 extern byte modObjCount;
 
-extern char playerNames[PLAYERNAME_COUNT][0x20];
+extern char playerNames[PLAYER_COUNT][0x20];
 extern byte playerCount;
 
 inline void SetActiveMod(int id) { activeMod = id; }
@@ -50,6 +60,14 @@ void SaveMods();
 int OpenModMenu();
 
 void RefreshEngine();
+void GetModCount();
+void GetModName(int *textMenu, int *highlight, uint *id, int *unused);
+void GetModDescription(int *textMenu, int *highlight, uint *id, int *unused);
+void GetModAuthor(int *textMenu, int *highlight, uint *id, int *unused);
+void GetModVersion(int *textMenu, int *highlight, uint *id, int *unused);
+void GetModActive(uint *id, int *unused);
+void SetModActive(uint *id, int *active);
+void MoveMod(uint *id, int *up);
 
 #endif
 

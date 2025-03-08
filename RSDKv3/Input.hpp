@@ -1,6 +1,11 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#if RETRO_PLATFORM == RETRO_SWITCH
+// expose it for hacks
+bool getControllerButton(byte buttonID);
+#endif
+
 enum InputButtons {
     INPUT_UP,
     INPUT_DOWN,
@@ -9,7 +14,13 @@ enum InputButtons {
     INPUT_BUTTONA,
     INPUT_BUTTONB,
     INPUT_BUTTONC,
+    INPUT_BUTTONX,
+    INPUT_BUTTONY,
+    INPUT_BUTTONZ,
+    INPUT_BUTTONL,
+    INPUT_BUTTONR,
     INPUT_START,
+    INPUT_SELECT,
     INPUT_ANY,
     INPUT_BUTTONCOUNT,
 };
@@ -22,7 +33,13 @@ struct InputData {
     bool A;
     bool B;
     bool C;
+    bool X;
+    bool Y;
+    bool Z;
+    bool L;
+    bool R;
     bool start;
+    bool select;
 };
 
 struct InputButton {
@@ -48,15 +65,15 @@ enum DefaultHapticIDs {
     HAPTIC_STOP = -1,
 };
 
-extern InputData keyPress;
-extern InputData keyDown;
-
-extern bool anyPress;
+extern InputData inputPress;
+extern InputData inputDown;
 
 extern int touchDown[8];
 extern int touchX[8];
 extern int touchY[8];
 extern int touchID[8];
+extern float touchXF[8];
+extern float touchYF[8];
 extern int touches;
 
 extern int hapticEffectNum;
@@ -71,6 +88,8 @@ extern float LTRIGGER_DEADZONE;
 extern float RTRIGGER_DEADZONE;
 
 extern int mouseHideTimer;
+extern int lastMouseX;
+extern int lastMouseY;
 #endif
 
 #if !RETRO_USE_ORIGINAL_CODE
@@ -90,8 +109,8 @@ enum ExtraSDLButtons {
     SDL_CONTROLLER_BUTTON_MAX_EXTRA,
 };
 
-void ControllerInit(byte controllerID);
-void ControllerClose(byte controllerID);
+void controllerInit(int controllerID);
+void controllerClose(int controllerID);
 #endif
 
 #if RETRO_USING_SDL1
@@ -100,11 +119,17 @@ extern byte keyState[SDLK_LAST];
 extern SDL_Joystick *controller;
 #endif
 
+void InitInputDevices();
+void ReleaseInputDevices();
+
 void ProcessInput();
 #endif
 
-void CheckKeyPress(InputData *input, byte Flags);
-void CheckKeyDown(InputData *input, byte Flags);
+void CheckKeyPress(InputData *input);
+void CheckKeyDown(InputData *input);
+
+int CheckTouchRect(float x1, float y1, float x2, float y2);
+int CheckTouchRectMatrix(void *m, float x1, float y1, float x2, float y2);
 
 #if RETRO_USE_HAPTICS
 inline int GetHapticEffectNum()
@@ -113,10 +138,7 @@ inline int GetHapticEffectNum()
     hapticEffectNum = HAPTIC_NONE;
     return num;
 }
-void QueueHapticEffect(int hapticID);
-void PlayHaptics(int left, int right, int power);
-void PlayHapticsID(int hapticID);
-void StopHaptics(int hapticID);
+void HapticEffect(int *id, int *a2, int *a3, int *a4);
 #endif
 
 #endif // !INPUT_H

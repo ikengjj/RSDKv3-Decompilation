@@ -13,7 +13,7 @@ int animationCount = 0;
 Hitbox hitboxList[HITBOX_COUNT];
 int hitboxCount = 0;
 
-void LoadAnimationFile(const char *filePath)
+void LoadAnimationFile(char *filePath)
 {
     FileInfo info;
     if (LoadFile(filePath, &info)) {
@@ -25,7 +25,6 @@ void LoadAnimationFile(const char *filePath)
         byte sheetCount = 0;
         FileRead(&sheetCount, 1);
 
-        // Read & load each spritesheet
         for (int s = 0; s < sheetCount; ++s) {
             FileRead(&fileBuffer, 1);
             if (fileBuffer) {
@@ -45,7 +44,6 @@ void LoadAnimationFile(const char *filePath)
         animFile->animCount     = animCount;
         animFile->aniListOffset = animationCount;
 
-        // Read animations
         for (int a = 0; a < animCount; ++a) {
             SpriteAnimation *anim = &animationList[animationCount++];
             anim->frameListOffset = animFrameCount;
@@ -83,7 +81,6 @@ void LoadAnimationFile(const char *filePath)
                 anim->frameCount >>= 1;
         }
 
-        // Read Hitboxes
         animFile->hitboxListOffset = hitboxCount;
         FileRead(&fileBuffer, 1);
         for (int i = 0; i < fileBuffer; ++i) {
@@ -112,15 +109,18 @@ void ClearAnimationData()
     animationCount     = 0;
     animationFileCount = 0;
     hitboxCount        = 0;
+
+    // Used for pause menu
+    LoadGIFFile("Data/Game/SystemText.gif", SURFACE_COUNT - 1);
+    StrCopy(gfxSurface[SURFACE_COUNT - 1].fileName, "Data/Game/SystemText.gif");
 }
 
-AnimationFile *AddAnimationFile(const char *filePath)
+AnimationFile *AddAnimationFile(char *filePath)
 {
     char path[0x80];
     StrCopy(path, "Data/Animations/");
     StrAdd(path, filePath);
 
-    // If matching anim is found return that, otherwise load a new anim
     for (int a = 0; a < 0x100; ++a) {
         if (StrLength(animationFileList[a].fileName) <= 0) {
             StrCopy(animationFileList[a].fileName, filePath);

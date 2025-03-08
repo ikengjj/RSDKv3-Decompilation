@@ -1,5 +1,5 @@
-#ifndef VIDEO_H
-#define VIDEO_H
+#ifndef VIDEO_HPP
+#define VIDEO_HPP
 
 #include "theoraplay.h"
 
@@ -16,12 +16,12 @@ extern THEORAPLAY_Io callbacks;
 
 extern byte videoSurface;
 extern int videoFilePos;
-extern int videoPlaying; // 0 = not playing, 1 = playing OGV, 2 = playing RSV
+extern int videoPlaying; // 0 = not playing, 1 = playing ogv, 2 = playing rsv
 extern int vidFrameMS;
-extern int vidBaseticks;
+extern int vidBaseTicks;
 extern float videoAR;
 
-void PlayVideoFile(char *filepath);
+void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();
 int ProcessVideo();
 void StopVideoPlayback();
@@ -29,4 +29,4 @@ void StopVideoPlayback();
 void SetupVideoBuffer(int width, int height);
 void CloseVideoBuffer();
 
-#endif // !VIDEO_H
+#endif

@@ -1,8 +1,8 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by RSDKv3.rc
+// Used by RSDKv4.rc
 //
-#define IDI_ICON1 101
+#define IDI_ICON1 102
 
 // Next default values for new objects
 //

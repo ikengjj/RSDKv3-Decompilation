@@ -2,39 +2,35 @@
 #include <math.h>
 #include <time.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846264338327950288
-#endif
+int sinM7LookupTable[0x200];
+int cosM7LookupTable[0x200];
 
-int sinMLookupTable[512];
-int cosMLookupTable[512];
+int sin512LookupTable[0x200];
+int cos512LookupTable[0x200];
 
-int sin512LookupTable[512];
-int cos512LookupTable[512];
-
-int sin256LookupTable[256];
-int cos256LookupTable[256];
+int sin256LookupTable[0x100];
+int cos256LookupTable[0x100];
 
 byte arcTan256LookupTable[0x100 * 0x100];
 
 void CalculateTrigAngles()
 {
-    srand((unsigned)time(NULL));
+    srand(time(NULL));
 
     for (int i = 0; i < 0x200; ++i) {
-        sinMLookupTable[i] = (sin((i / 256.0) * M_PI) * 4096.0);
-        cosMLookupTable[i] = (cos((i / 256.0) * M_PI) * 4096.0);
+        sinM7LookupTable[i] = (sin((i / 256.0) * M_PI) * 4096.0);
+        cosM7LookupTable[i] = (cos((i / 256.0) * M_PI) * 4096.0);
     }
 
-    cosMLookupTable[0x00]  = 0x1000;
-    cosMLookupTable[0x80]  = 0;
-    cosMLookupTable[0x100] = -0x1000;
-    cosMLookupTable[0x180] = 0;
+    cosM7LookupTable[0x00]  = 0x1000;
+    cosM7LookupTable[0x80]  = 0;
+    cosM7LookupTable[0x100] = -0x1000;
+    cosM7LookupTable[0x180] = 0;
 
-    sinMLookupTable[0x00]  = 0;
-    sinMLookupTable[0x80]  = 0x1000;
-    sinMLookupTable[0x100] = 0;
-    sinMLookupTable[0x180] = -0x1000;
+    sinM7LookupTable[0x00]  = 0;
+    sinM7LookupTable[0x80]  = 0x1000;
+    sinM7LookupTable[0x100] = 0;
+    sinM7LookupTable[0x180] = -0x1000;
 
     for (int i = 0; i < 0x200; ++i) {
         sin512LookupTable[i] = (sinf((i / 256.0) * M_PI) * 512.0);

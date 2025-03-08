@@ -1,13 +1,20 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include <stdlib.h>
-
-#include <vorbis/vorbisfile.h>
-
-#if RETRO_PLATFORM != RETRO_VITA && RETRO_PLATFORM != RETRO_OSX
-#include "SDL.h"
+#define TRACK_COUNT (0x10)
+#define SFX_COUNT   (0x100)
+#if !RETRO_USE_ORIGINAL_CODE
+#define CHANNEL_COUNT (0x10) // 4 in the original, 16 for convenience
+#else
+#define CHANNEL_COUNT (0x4)
 #endif
+
+#define MAX_VOLUME (100)
+
+#define MUSBUFFER_SIZE   (0x2000000)
+#define STREAMFILE_COUNT (2)
+
+#define MIX_BUFFER_SAMPLES (256)
 
 #if RETRO_USING_SDL1 || RETRO_USING_SDL2
 
@@ -18,17 +25,6 @@
 #define LockAudioDevice()   ;
 #define UnlockAudioDevice() ;
 #endif
-
-#define TRACK_COUNT   (0x10)
-#define SFX_COUNT     (0x100)
-#define CHANNEL_COUNT (0x4)
-#define SFXDATA_COUNT (0x400000)
-
-#define MAX_VOLUME (100)
-
-#define STREAMFILE_COUNT (2)
-
-#define MIX_BUFFER_SAMPLES (256)
 
 struct TrackInfo {
     char fileName[0x40];
@@ -67,7 +63,7 @@ struct ChannelInfo {
 };
 
 struct StreamFile {
-    byte *buffer;
+    byte buffer[MUSBUFFER_SIZE];
     int fileSize;
     int filePos;
 };
@@ -89,19 +85,23 @@ extern int sfxVolume;
 extern int bgmVolume;
 extern bool audioEnabled;
 
-extern int nextChannelPos;
 extern bool musicEnabled;
 extern int musicStatus;
+extern int musicStartPos;
+extern int musicPosition;
+extern int musicRatio;
 extern TrackInfo musicTracks[TRACK_COUNT];
-extern SFXInfo sfxList[SFX_COUNT];
-
-extern ChannelInfo sfxChannels[CHANNEL_COUNT];
 
 extern int currentStreamIndex;
 extern StreamFile streamFile[STREAMFILE_COUNT];
 extern StreamInfo streamInfo[STREAMFILE_COUNT];
 extern StreamFile *streamFilePtr;
 extern StreamInfo *streamInfoPtr;
+
+extern SFXInfo sfxList[SFX_COUNT];
+extern char sfxNames[SFX_COUNT][0x40];
+
+extern ChannelInfo sfxChannels[CHANNEL_COUNT];
 
 #if RETRO_USING_SDL1 || RETRO_USING_SDL2
 extern SDL_AudioSpec audioDeviceFormat;
@@ -111,49 +111,60 @@ int InitAudioPlayback();
 void LoadGlobalSfx();
 
 #if RETRO_USING_SDL1 || RETRO_USING_SDL2
-void ProcessMusicStream(void *data, Sint16 *stream, int len);
+#if !RETRO_USE_ORIGINAL_CODE
+// These functions did exist, but with different signatures
+void ProcessMusicStream(Sint32 *stream, size_t bytes_wanted);
 void ProcessAudioPlayback(void *data, Uint8 *stream, int len);
 void ProcessAudioMixing(Sint32 *dst, const Sint16 *src, int len, int volume, sbyte pan);
+#endif
 
-inline void FreeMusInfo()
+#if !RETRO_USE_ORIGINAL_CODE
+inline void freeMusInfo()
 {
     LockAudioDevice();
 
 #if RETRO_USING_SDL2
     if (streamInfo[currentStreamIndex].stream)
         SDL_FreeAudioStream(streamInfo[currentStreamIndex].stream);
+    streamInfo[currentStreamIndex].stream = NULL;
 #endif
+
     ov_clear(&streamInfo[currentStreamIndex].vorbisFile);
+
 #if RETRO_USING_SDL2
     streamInfo[currentStreamIndex].stream = nullptr;
 #endif
-    if (streamFile[currentStreamIndex].buffer)
-        free(streamFile[currentStreamIndex].buffer);
-    streamFile[currentStreamIndex].buffer = NULL;
 
     UnlockAudioDevice();
 }
+#endif
 #else
 void ProcessMusicStream() {}
 void ProcessAudioPlayback() {}
 void ProcessAudioMixing() {}
 
-inline void FreeMusInfo() { ov_clear(&streamInfo[currentStreamIndex].vorbisFile); }
+#if !RETRO_USE_ORIGINAL_CODE
+inline void freeMusInfo() { ov_clear(&streamInfo[currentStreamIndex].vorbisFile); }
+#endif
 #endif
 
-#if RETRO_USE_MOD_LOADER
-extern char globalSfxNames[SFX_COUNT][0x40];
-extern char stageSfxNames[SFX_COUNT][0x40];
-void SetSfxName(const char *sfxName, int sfxID, bool global);
-#endif
-
-void LoadMusic();
-void SetMusicTrack(char *filePath, byte trackID, bool loop, uint loopPoint);
-bool PlayMusic(int track);
-inline void StopMusic()
+void LoadMusic(void *userdata);
+void SetMusicTrack(const char *filePath, byte trackID, bool loop, uint loopPoint);
+void SwapMusicTrack(const char *filePath, byte trackID, uint loopPoint, uint ratio);
+bool PlayMusic(int track, int musStartPos);
+inline void StopMusic(bool setStatus)
 {
-    musicStatus = MUSIC_STOPPED;
-    FreeMusInfo();
+    if (setStatus) {
+        musicStatus = MUSIC_STOPPED;
+		trackID = -1;
+	}
+    musicPosition = 0;
+
+#if !RETRO_USE_ORIGINAL_CODE
+    LockAudioDevice();
+    freeMusInfo();
+    UnlockAudioDevice();
+#endif
 }
 
 void LoadSfx(char *filePath, byte sfxID);
@@ -169,13 +180,74 @@ inline void StopSfx(int sfx)
 }
 void SetSfxAttributes(int sfx, int loopCount, sbyte pan);
 
+void SetSfxName(const char *sfxName, int sfxID);
+
+#if !RETRO_USE_ORIGINAL_CODE
+// Helper Funcs
+inline bool PlaySfxByName(const char *sfx, sbyte loopCnt)
+{
+    char buffer[0x40];
+    int pos = 0;
+    while (*sfx) {
+        if (*sfx != ' ')
+            buffer[pos++] = *sfx;
+        sfx++;
+    }
+    buffer[pos] = 0;
+
+    for (int s = 0; s < globalSFXCount + stageSFXCount; ++s) {
+        if (StrComp(sfxNames[s], buffer)) {
+            PlaySfx(s, loopCnt);
+            return true;
+        }
+    }
+    return false;
+}
+inline bool StopSFXByName(const char *sfx)
+{
+    char buffer[0x40];
+    int pos = 0;
+    while (*sfx) {
+        if (*sfx != ' ')
+            buffer[pos++] = *sfx;
+        sfx++;
+    }
+    buffer[pos] = 0;
+
+    for (int s = 0; s < globalSFXCount + stageSFXCount; ++s) {
+        if (StrComp(sfxNames[s], buffer)) {
+            StopSfx(s);
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+
 inline void SetMusicVolume(int volume)
 {
     if (volume < 0)
         volume = 0;
     if (volume > MAX_VOLUME)
         volume = MAX_VOLUME;
+
     masterVolume = volume;
+}
+
+inline void SetGameVolumes(int bgmVol, int sfxVol)
+{
+    bgmVolume = bgmVol;
+    sfxVolume = sfxVol;
+
+    if (bgmVolume < 0)
+        bgmVolume = 0;
+    if (bgmVolume > MAX_VOLUME)
+        bgmVolume = MAX_VOLUME;
+
+    if (sfxVolume < 0)
+        sfxVolume = 0;
+    if (sfxVolume > MAX_VOLUME)
+        sfxVolume = MAX_VOLUME;
 }
 
 inline bool PauseSound()
@@ -195,37 +267,54 @@ inline void ResumeSound()
 
 inline void StopAllSfx()
 {
+#if !RETRO_USE_ORIGINAL_CODE
+    LockAudioDevice();
+#endif
+
     for (int i = 0; i < CHANNEL_COUNT; ++i) sfxChannels[i].sfxID = -1;
+
+#if !RETRO_USE_ORIGINAL_CODE
+    UnlockAudioDevice();
+#endif
 }
 inline void ReleaseGlobalSfx()
 {
-    StopAllSfx();
     for (int i = globalSFXCount - 1; i >= 0; --i) {
         if (sfxList[i].loaded) {
             StrCopy(sfxList[i].name, "");
-            free(sfxList[i].buffer);
+            StrCopy(sfxNames[i], "");
+            if (sfxList[i].buffer)
+                free(sfxList[i].buffer);
+
+            sfxList[i].buffer = NULL;
             sfxList[i].length = 0;
             sfxList[i].loaded = false;
         }
     }
+
     globalSFXCount = 0;
 }
 inline void ReleaseStageSfx()
 {
-    for (int i = stageSFXCount + globalSFXCount; i >= globalSFXCount; --i) {
+    for (int i = (stageSFXCount + globalSFXCount) - 1; i >= globalSFXCount; --i) {
         if (sfxList[i].loaded) {
             StrCopy(sfxList[i].name, "");
-            free(sfxList[i].buffer);
+            StrCopy(sfxNames[i], "");
+            if (sfxList[i].buffer)
+                free(sfxList[i].buffer);
+
+            sfxList[i].buffer = NULL;
             sfxList[i].length = 0;
             sfxList[i].loaded = false;
         }
     }
+
     stageSFXCount = 0;
 }
 
 inline void ReleaseAudioDevice()
 {
-    StopMusic();
+    StopMusic(true);
     StopAllSfx();
     ReleaseStageSfx();
     ReleaseGlobalSfx();

@@ -13,10 +13,10 @@
 #define TILE_DATASIZE (TILE_SIZE * TILE_SIZE)
 #define TILESET_SIZE  (TILE_COUNT * TILE_DATASIZE)
 
-#define TILELAYER_CHUNK_W      (0x100)
-#define TILELAYER_CHUNK_H      (0x100)
-#define TILELAYER_CHUNK_COUNT  (TILELAYER_CHUNK_W * TILELAYER_CHUNK_H)
-#define TILELAYER_SCROLL_COUNT (TILELAYER_CHUNK_H * CHUNK_SIZE)
+#define TILELAYER_CHUNK_W          (0x100)
+#define TILELAYER_CHUNK_H          (0x100)
+#define TILELAYER_CHUNK_COUNT      (TILELAYER_CHUNK_W * TILELAYER_CHUNK_H)
+#define TILELAYER_LINESCROLL_COUNT (TILELAYER_CHUNK_H * CHUNK_SIZE)
 
 #define CHUNKTILE_COUNT (0x200 * (8 * 8))
 
@@ -42,6 +42,19 @@ enum StageModes {
     STAGEMODE_LOAD,
     STAGEMODE_NORMAL,
     STAGEMODE_PAUSED,
+    STAGEMODE_FROZEN,
+
+#if !RETRO_REV00
+    STAGEMODE_2P,
+#endif
+
+    STAGEMODE_NORMAL_STEP,
+    STAGEMODE_PAUSED_STEP,
+    STAGEMODE_FROZEN_STEP,
+
+#if !RETRO_REV00
+    STAGEMODE_2P_STEP,
+#endif
 };
 
 enum TileInfo {
@@ -89,14 +102,14 @@ struct CollisionMasks {
 
 struct TileLayer {
     ushort tiles[TILELAYER_CHUNK_COUNT];
-    byte lineScroll[TILELAYER_SCROLL_COUNT];
+    byte lineScroll[TILELAYER_LINESCROLL_COUNT];
     int parallaxFactor;
     int scrollSpeed;
     int scrollPos;
     int angle;
-    int XPos;
-    int YPos;
-    int ZPos;
+    int xpos;
+    int ypos;
+    int zpos;
     int deformationOffset;
     int deformationOffsetW;
     byte type;
@@ -133,22 +146,21 @@ extern int cameraEnabled;
 extern int cameraAdjustY;
 extern int xScrollOffset;
 extern int yScrollOffset;
-extern int yScrollA;
-extern int yScrollB;
-extern int xScrollA;
-extern int xScrollB;
-extern int yScrollMove;
+extern int cameraXPos;
+extern int cameraYPos;
+extern int cameraShift;
+extern int cameraLockedY;
 extern int cameraShakeX;
 extern int cameraShakeY;
 extern int cameraLag;
 extern int cameraLagStyle;
 
-extern int xBoundary1;
+extern int curXBoundary1;
 extern int newXBoundary1;
-extern int yBoundary1;
+extern int curYBoundary1;
 extern int newYBoundary1;
-extern int xBoundary2;
-extern int yBoundary2;
+extern int curXBoundary2;
+extern int curYBoundary2;
 extern int waterLevel;
 extern int waterDrawPos;
 extern int newXBoundary2;
@@ -200,7 +212,10 @@ extern ushort tile3DFloorBuffer[0x100 * 0x100];
 extern bool drawStageGFXHQ;
 
 void InitFirstStage();
+void InitStartingStage(int list, int stage, int player);
 void ProcessStage();
+
+void ProcessParallaxAutoScroll();
 
 void ResetBackgroundSettings();
 inline void ResetCurrentStageFolder() { strcpy(currentStageFolder, ""); }
@@ -224,7 +239,6 @@ void LoadStageBackground();
 void LoadStageChunks();
 void LoadStageCollisions();
 void LoadStageGIFFile(int stageID);
-void LoadStageGFXFile(int stageID);
 
 inline void Init3DFloorBuffer(int layerID)
 {
@@ -239,25 +253,18 @@ inline void Init3DFloorBuffer(int layerID)
 
 inline void Copy16x16Tile(ushort dest, ushort src)
 {
-    if (renderType == RENDER_SW) {
-        byte *destPtr = &tilesetGFXData[TILELAYER_CHUNK_W * dest];
-        byte *srcPtr  = &tilesetGFXData[TILELAYER_CHUNK_W * src];
-        int cnt       = TILE_DATASIZE;
-        while (cnt--) *destPtr++ = *srcPtr++;
-    }
-    else if (renderType == RENDER_HW) {
-        tileUVArray[4 * dest + 0] = tileUVArray[4 * src + 0];
-        tileUVArray[4 * dest + 1] = tileUVArray[4 * src + 1];
-        tileUVArray[4 * dest + 2] = tileUVArray[4 * src + 2];
-        tileUVArray[4 * dest + 3] = tileUVArray[4 * src + 3];
-    }
+    byte *destPtr = &tilesetGFXData[TILELAYER_CHUNK_W * dest];
+    byte *srcPtr  = &tilesetGFXData[TILELAYER_CHUNK_W * src];
+    int cnt       = TILE_DATASIZE;
+    while (cnt--) *destPtr++ = *srcPtr++;
 }
 
-void SetLayerDeformation(int selectedDef, int waveLength, int waveType, int deformType, int YPos, int waveSize);
+void SetLayerDeformation(int selectedDef, int waveLength, int waveWidth, int waveType, int YPos, int waveSize);
 
-void SetPlayerScreenPosition(Player *player);
-void SetPlayerScreenPositionCDStyle(Player *player);
-void SetPlayerHLockedScreenPosition(Player *player);
-void SetPlayerLockedScreenPosition(Player *player);
+void SetPlayerScreenPosition(Entity *target);
+void SetPlayerScreenPositionCDStyle(Entity *target);
+void SetPlayerHLockedScreenPosition(Entity *target);
+void SetPlayerLockedScreenPosition(Entity *target);
+void SetPlayerScreenPositionFixed(Entity *target);
 
 #endif // !SCENE_H

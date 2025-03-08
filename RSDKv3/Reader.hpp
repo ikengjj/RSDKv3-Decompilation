@@ -1,6 +1,19 @@
 #ifndef READER_H
 #define READER_H
 
+#if RETRO_PLATFORM == RETRO_LINUX   // Force case insensitivity for Linux
+
+#include "fcaseopen.h"
+#define FileIO                                          FILE
+#define fOpen(path, mode)                               fcaseopen(path, mode)
+#define fRead(buffer, elementSize, elementCount, file)  fread(buffer, elementSize, elementCount, file)
+#define fSeek(file, offset, whence)                     fseek(file, offset, whence)
+#define fTell(file)                                     ftell(file)
+#define fClose(file)                                    fclose(file)
+#define fWrite(buffer, elementSize, elementCount, file) fwrite(buffer, elementSize, elementCount, file)
+
+#else                               // Force case insensitivity for Linux
+
 #ifdef FORCE_CASE_INSENSITIVE
 
 #include "fcaseopen.h"
@@ -14,7 +27,7 @@
 
 #else
 
-#if RETRO_USING_SDL2
+#if RETRO_USING_SDL1 || RETRO_USING_SDL2
 #define FileIO                                          SDL_RWops
 #define fOpen(path, mode)                               SDL_RWFromFile(path, mode)
 #define fRead(buffer, elementSize, elementCount, file)  SDL_RWread(file, buffer, elementSize, elementCount)
@@ -32,12 +45,17 @@
 #define fWrite(buffer, elementSize, elementCount, file) fwrite(buffer, elementSize, elementCount, file)
 #endif
 
+#endif                              // Force case insensitivity for Linux
+
 #endif
+
+#define RETRO_PACKFILE_COUNT (0x1000)
+#define RETRO_PACK_COUNT     (0x4)
 
 struct FileInfo {
     char fileName[0x100];
     int fileSize;
-    int vFileSize;
+    int vfileSize;
     int readPos;
     int bufferPosition;
     int virtualFileOffset;
@@ -45,14 +63,32 @@ struct FileInfo {
     byte eStringPosB;
     byte eStringNo;
     byte eNybbleSwap;
+    bool useEncryption;
+    byte packID;
+    byte encryptionStringA[0x10];
+    byte encryptionStringB[0x10];
+#if !RETRO_USE_ORIGINAL_CODE
     FileIO *cFileHandle;
-    byte *fileBuffer;
-#if RETRO_USE_MOD_LOADER
-    byte isMod;
+    bool usingDataPack;
 #endif
 };
 
-extern char rsdkName[0x400];
+struct RSDKFileInfo {
+    uint hash[4];
+    int offset;
+    int filesize;
+    bool encrypted;
+    byte packID;
+};
+
+struct RSDKContainer {
+    RSDKFileInfo files[RETRO_PACKFILE_COUNT];
+    char packNames[RETRO_PACK_COUNT][0x400];
+    int fileCount;
+    int packCount;
+};
+
+extern RSDKContainer rsdkContainer;
 
 extern char fileName[0x100];
 extern byte fileBuffer[0x2000];
@@ -62,15 +98,14 @@ extern int readPos;
 extern int readSize;
 extern int bufferPosition;
 extern int virtualFileOffset;
+extern bool useEncryption;
+extern byte packID;
 extern byte eStringPosA;
 extern byte eStringPosB;
 extern byte eStringNo;
 extern byte eNybbleSwap;
-extern char encryptionStringA[21];
-extern char encryptionStringB[13];
-#if RETRO_USE_MOD_LOADER
-extern byte isModdedFile;
-#endif
+extern byte encryptionStringA[0x10];
+extern byte encryptionStringB[0x10];
 
 extern FileIO *cFileHandle;
 
@@ -87,6 +122,18 @@ inline void CopyFilePath(char *dest, const char *src)
     }
 }
 bool CheckRSDKFile(const char *filePath);
+inline void CloseRSDKContainers()
+{
+    for (int i = 0; i < 4; ++i) {
+        strcpy(rsdkContainer.packNames[i], "");
+    }
+    rsdkContainer.packCount = 0;
+    rsdkContainer.fileCount = 0;
+}
+
+#if !RETRO_USE_ORIGINAL_CODE
+int CheckFileInfo(const char *filepath);
+#endif
 
 bool LoadFile(const char *filePath, FileInfo *fileInfo);
 inline bool CloseFile()
@@ -99,9 +146,10 @@ inline bool CloseFile()
     return result;
 }
 
-void FileRead(void *dest, int size);
+void GenerateELoadKeys(uint key1, uint key2);
 
-bool ParseVirtualFileSystem(FileInfo *fileInfo);
+void FileRead(void *dest, int size);
+void FileSkip(int count);
 
 inline size_t FillFileBuffer()
 {
@@ -110,28 +158,13 @@ inline size_t FillFileBuffer()
     else
         readSize = fileSize - readPos;
 
-    size_t result = fRead(fileBuffer, 1, readSize, cFileHandle);
+    size_t result = fRead(fileBuffer, 1u, readSize, cFileHandle);
     readPos += readSize;
     bufferPosition = 0;
     return result;
 }
 
-inline void GetFileInfo(FileInfo *fileInfo)
-{
-    StrCopy(fileInfo->fileName, fileName);
-    fileInfo->bufferPosition    = bufferPosition;
-    fileInfo->readPos           = readPos - readSize;
-    fileInfo->fileSize          = fileSize;
-    fileInfo->vFileSize         = vFileSize;
-    fileInfo->virtualFileOffset = virtualFileOffset;
-    fileInfo->eStringPosA       = eStringPosA;
-    fileInfo->eStringPosB       = eStringPosB;
-    fileInfo->eStringNo         = eStringNo;
-    fileInfo->eNybbleSwap       = eNybbleSwap;
-#if RETRO_USE_MOD_LOADER
-    fileInfo->isMod = isModdedFile;
-#endif
-}
+void GetFileInfo(FileInfo *fileInfo);
 void SetFileInfo(FileInfo *fileInfo);
 size_t GetFilePosition();
 void SetFilePosition(int newPos);

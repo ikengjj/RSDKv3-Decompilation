@@ -1,147 +1,17 @@
 #include "RetroEngine.hpp"
 
-#include <algorithm>
-#include <vector>
-
-InputData keyPress = InputData();
-InputData keyDown  = InputData();
-
-bool anyPress = false;
+InputData inputPress = InputData();
+InputData inputDown  = InputData();
 
 int touchDown[8];
 int touchX[8];
 int touchY[8];
 int touchID[8];
+float touchXF[8];
+float touchYF[8];
 int touches = 0;
 
 int hapticEffectNum = -2;
-
-enum AndroidHapticIDs {
-    HAPTIC_ALERT1                         = 63,
-    HAPTIC_ALERT10                        = 72,
-    HAPTIC_ALERT2                         = 64,
-    HAPTIC_ALERT3                         = 65,
-    HAPTIC_ALERT4                         = 66,
-    HAPTIC_ALERT5                         = 67,
-    HAPTIC_ALERT6                         = 68,
-    HAPTIC_ALERT7                         = 69,
-    HAPTIC_ALERT8                         = 70,
-    HAPTIC_ALERT9                         = 71,
-    HAPTIC_BOUNCE_100                     = 9,
-    HAPTIC_BOUNCE_33                      = 11,
-    HAPTIC_BOUNCE_66                      = 10,
-    HAPTIC_BUMP_100                       = 6,
-    HAPTIC_BUMP_33                        = 8,
-    HAPTIC_BUMP_66                        = 7,
-    HAPTIC_DOUBLE_BUMP_100                = 18,
-    HAPTIC_DOUBLE_BUMP_33                 = 20,
-    HAPTIC_DOUBLE_BUMP_66                 = 19,
-    HAPTIC_DOUBLE_SHARP_CLICK_100         = 12,
-    HAPTIC_DOUBLE_SHARP_CLICK_33          = 14,
-    HAPTIC_DOUBLE_SHARP_CLICK_66          = 13,
-    HAPTIC_DOUBLE_STRONG_CLICK_100        = 15,
-    HAPTIC_DOUBLE_STRONG_CLICK_33         = 17,
-    HAPTIC_DOUBLE_STRONG_CLICK_66         = 16,
-    HAPTIC_ENGINE1_100                    = 112,
-    HAPTIC_ENGINE1_33                     = 114,
-    HAPTIC_ENGINE1_66                     = 113,
-    HAPTIC_ENGINE2_100                    = 115,
-    HAPTIC_ENGINE2_33                     = 117,
-    HAPTIC_ENGINE2_66                     = 116,
-    HAPTIC_ENGINE3_100                    = 118,
-    HAPTIC_ENGINE3_33                     = 120,
-    HAPTIC_ENGINE3_66                     = 119,
-    HAPTIC_ENGINE4_100                    = 121,
-    HAPTIC_ENGINE4_33                     = 123,
-    HAPTIC_ENGINE4_66                     = 122,
-    HAPTIC_EXPLOSION1                     = 73,
-    HAPTIC_EXPLOSION10                    = 82,
-    HAPTIC_EXPLOSION2                     = 74,
-    HAPTIC_EXPLOSION3                     = 75,
-    HAPTIC_EXPLOSION4                     = 76,
-    HAPTIC_EXPLOSION5                     = 77,
-    HAPTIC_EXPLOSION6                     = 78,
-    HAPTIC_EXPLOSION7                     = 79,
-    HAPTIC_EXPLOSION8                     = 80,
-    HAPTIC_EXPLOSION9                     = 81,
-    HAPTIC_FAST_PULSE_100                 = 45,
-    HAPTIC_FAST_PULSE_33                  = 47,
-    HAPTIC_FAST_PULSE_66                  = 46,
-    HAPTIC_FAST_PULSING_100               = 48,
-    HAPTIC_FAST_PULSING_33                = 50,
-    HAPTIC_FAST_PULSING_66                = 49,
-    HAPTIC_IMPACT_METAL_100               = 96,
-    HAPTIC_IMPACT_METAL_33                = 98,
-    HAPTIC_IMPACT_METAL_66                = 97,
-    HAPTIC_IMPACT_RUBBER_100              = 99,
-    HAPTIC_IMPACT_RUBBER_33               = 101,
-    HAPTIC_IMPACT_RUBBER_66               = 100,
-    HAPTIC_IMPACT_WOOD_100                = 93,
-    HAPTIC_IMPACT_WOOD_33                 = 95,
-    HAPTIC_IMPACT_WOOD_66                 = 94,
-    HAPTIC_LONG_BUZZ_100                  = 27,
-    HAPTIC_LONG_BUZZ_33                   = 29,
-    HAPTIC_LONG_BUZZ_66                   = 28,
-    HAPTIC_LONG_TRANSITION_RAMP_DOWN_100  = 39,
-    HAPTIC_LONG_TRANSITION_RAMP_DOWN_33   = 41,
-    HAPTIC_LONG_TRANSITION_RAMP_DOWN_66   = 40,
-    HAPTIC_LONG_TRANSITION_RAMP_UP_100    = 33,
-    HAPTIC_LONG_TRANSITION_RAMP_UP_33     = 35,
-    HAPTIC_LONG_TRANSITION_RAMP_UP_66     = 34,
-    HAPTIC_SHARP_CLICK_100                = 0,
-    HAPTIC_SHARP_CLICK_33                 = 2,
-    HAPTIC_SHARP_CLICK_66                 = 1,
-    HAPTIC_SHORT_BUZZ_100                 = 30,
-    HAPTIC_SHORT_BUZZ_33                  = 32,
-    HAPTIC_SHORT_BUZZ_66                  = 31,
-    HAPTIC_SHORT_TRANSITION_RAMP_DOWN_100 = 42,
-    HAPTIC_SHORT_TRANSITION_RAMP_DOWN_33  = 44,
-    HAPTIC_SHORT_TRANSITION_RAMP_DOWN_66  = 43,
-    HAPTIC_SHORT_TRANSITION_RAMP_UP_100   = 36,
-    HAPTIC_SHORT_TRANSITION_RAMP_UP_33    = 38,
-    HAPTIC_SHORT_TRANSITION_RAMP_UP_66    = 37,
-    HAPTIC_SLOW_PULSE_100                 = 51,
-    HAPTIC_SLOW_PULSE_33                  = 53,
-    HAPTIC_SLOW_PULSE_66                  = 52,
-    HAPTIC_SLOW_PULSING_100               = 54,
-    HAPTIC_SLOW_PULSING_33                = 56,
-    HAPTIC_SLOW_PULSING_66                = 55,
-    HAPTIC_STRONG_CLICK_100               = 3,
-    HAPTIC_STRONG_CLICK_33                = 5,
-    HAPTIC_STRONG_CLICK_66                = 4,
-    HAPTIC_TEXTURE1                       = 102,
-    HAPTIC_TEXTURE10                      = 111,
-    HAPTIC_TEXTURE2                       = 103,
-    HAPTIC_TEXTURE3                       = 104,
-    HAPTIC_TEXTURE4                       = 105,
-    HAPTIC_TEXTURE5                       = 106,
-    HAPTIC_TEXTURE6                       = 107,
-    HAPTIC_TEXTURE7                       = 108,
-    HAPTIC_TEXTURE8                       = 109,
-    HAPTIC_TEXTURE9                       = 110,
-    HAPTIC_TICK_100                       = 24,
-    HAPTIC_TICK_33                        = 26,
-    HAPTIC_TICK_66                        = 25,
-    HAPTIC_TRANSITION_BOUNCE_100          = 60,
-    HAPTIC_TRANSITION_BOUNCE_33           = 62,
-    HAPTIC_TRANSITION_BOUNCE_66           = 61,
-    HAPTIC_TRANSITION_BUMP_100            = 57,
-    HAPTIC_TRANSITION_BUMP_33             = 59,
-    HAPTIC_TRANSITION_BUMP_66             = 58,
-    HAPTIC_TRIPLE_STRONG_CLICK_100        = 21,
-    HAPTIC_TRIPLE_STRONG_CLICK_33         = 23,
-    HAPTIC_TRIPLE_STRONG_CLICK_66         = 22,
-    HAPTIC_WEAPON1                        = 83,
-    HAPTIC_WEAPON10                       = 92,
-    HAPTIC_WEAPON2                        = 84,
-    HAPTIC_WEAPON3                        = 85,
-    HAPTIC_WEAPON4                        = 86,
-    HAPTIC_WEAPON5                        = 87,
-    HAPTIC_WEAPON6                        = 88,
-    HAPTIC_WEAPON7                        = 89,
-    HAPTIC_WEAPON8                        = 90,
-    HAPTIC_WEAPON9                        = 91,
-};
 
 #if !RETRO_USE_ORIGINAL_CODE
 #include <algorithm>
@@ -160,14 +30,23 @@ int mouseHideTimer = 0;
 int lastMouseX     = 0;
 int lastMouseY     = 0;
 
+struct InputDevice {
 #if RETRO_USING_SDL2
-std::vector<SDL_GameController *> controllers;
+    // we need the controller index reported from SDL2's controller added event
+    int index;
+    SDL_GameController *devicePtr;
+    SDL_Haptic *hapticPtr;
 #endif
+#if RETRO_USING_SDL1
+    SDL_Joystick *devicePtr;
+#endif
+    int id;
+};
+
+std::vector<InputDevice> controllers;
 
 #if RETRO_USING_SDL1
 byte keyState[SDLK_LAST];
-
-SDL_Joystick *controller = nullptr;
 #endif
 
 #define normalize(val, minVal, maxVal) ((float)(val) - (float)(minVal)) / ((float)(maxVal) - (float)(minVal))
@@ -178,11 +57,12 @@ bool getControllerButton(byte buttonID)
     bool pressed = false;
 
     for (int i = 0; i < controllers.size(); ++i) {
-        SDL_GameController *controller = controllers[i];
+		if (pressed) break;
+        SDL_GameController *controller = controllers[i].devicePtr;
 
         if (SDL_GameControllerGetButton(controller, (SDL_GameControllerButton)buttonID)) {
             pressed |= true;
-            continue;
+            break;
         }
         else {
             switch (buttonID) {
@@ -329,26 +209,125 @@ bool getControllerButton(byte buttonID)
 }
 #endif //! RETRO_USING_SDL2
 
-void ControllerInit(byte controllerID)
+void controllerInit(int controllerID) // controllerID = SDL2 controller index
 {
+    for (int i = 0; i < controllers.size(); ++i) {
+        if (controllers[i].id == controllerID) {
+            return; // we already opened this one!
+        }
+    }
+
+#if RETRO_USING_SDL2
     SDL_GameController *controller = SDL_GameControllerOpen(controllerID);
     if (controller) {
-        controllers.push_back(controller);
+        InputDevice device;
+        device.id        = controllerID;
+        device.index     = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller));
+        device.devicePtr = controller;
+        device.hapticPtr = SDL_HapticOpenFromJoystick(SDL_GameControllerGetJoystick(controller));
+        if (device.hapticPtr == NULL) {
+            PrintLog("Could not open controller haptics...\nSDL_GetError() -> %s", SDL_GetError());
+        }
+        else {
+            if (SDL_HapticRumbleInit(device.hapticPtr) < 0) {
+                printf("Unable to initialize rumble!\nSDL_GetError() -> %s", SDL_GetError());
+            }
+        }
+
+        controllers.push_back(device);
         inputType = 1;
     }
+    else {
+        PrintLog("Could not open controller...\nSDL_GetError() -> %s", SDL_GetError());
+    }
+#endif
 }
 
-void ControllerClose(byte controllerID)
+void controllerClose(int controllerID) // controllerID = SDL2 controller id
 {
+#if RETRO_USING_SDL2
     SDL_GameController *controller = SDL_GameControllerFromInstanceID(controllerID);
     if (controller) {
         SDL_GameControllerClose(controller);
-        controllers.erase(std::remove(controllers.begin(), controllers.end(), controller), controllers.end());
+#endif
+        // ok; when compiling under msvc, this code crashes with the controllers.erase() call (when the controllers vector is 1 element long)
+        // why? i'm under the impression that it's some msvc bug to do with the vector length being 1
+        // i've really got no idea, this code compiles and works fine under linux (gcc), so i suspect it must be an msvc fault (as always lmao)
+        if (controllers.size() == 1) {
+            controllers.clear();
+        } else {
+            for (int i = 0; i < controllers.size(); ++i) {
+                if (controllers[i].index == controllerID) {
+                    controllers.erase(controllers.begin() + i);
+#if RETRO_USING_SDL2
+                    if (controllers[i].hapticPtr) {
+                        SDL_HapticClose(controllers[i].hapticPtr);
+                    }
+#endif
+                    break;
+                }
+            }
+        }
+#if RETRO_USING_SDL2
+    }
+#endif
+
+    if (controllers.empty())
+        inputType = 0;
+}
+
+void InitInputDevices()
+{
+#if RETRO_USING_SDL2
+#if RETRO_PLATFORM == RETRO_SWITCH
+    // just gonna override the mapping and be done with it
+    SDL_GameControllerAddMapping("53776974636820436f6e74726f6c6c65,Switch Controller,a:b0,b:b1,back:b11,dpdown:b15,dpleft:b12,dpright:b14,dpup:b13,leftshoulder:b6,leftstick:b4,lefttrigger:b8,leftx:a0,lefty:a1,rightshoulder:b7,rightstick:b5,righttrigger:b9,rightx:a2,righty:a3,start:b10,x:b3,y:b2,");
+#endif
+    PrintLog("Initializing gamepads...");
+
+    // fix for issue #334 on github, not sure what's going wrong, but it seems to not be initializing the gamepad api maybe?
+    SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER);
+
+
+    int joyStickCount = SDL_NumJoysticks();
+    controllers.clear();
+    int gamepadCount = 0;
+
+    // Count how many controllers there are
+    for (int i = 0; i < joyStickCount; i++)
+        if (SDL_IsGameController(i))
+            gamepadCount++;
+
+    PrintLog("Found %d gamepads!", gamepadCount);
+    for (int i = 0; i < gamepadCount; i++) {
+        SDL_GameController *gamepad = SDL_GameControllerOpen(i);
+        InputDevice device;
+        device.id        = 0;
+        device.index     = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad));
+        device.devicePtr = gamepad;
+
+        if (SDL_GameControllerGetAttached(gamepad))
+            controllers.push_back(device);
+        else
+            PrintLog("InitInputDevices() error -> %s", SDL_GetError());
     }
 
-    if (controllers.empty()) {
-        inputType = 0;
+    if (gamepadCount > 0)
+        SDL_GameControllerEventState(SDL_ENABLE);
+#endif
+}
+
+void ReleaseInputDevices()
+{
+    for (int i = 0; i < controllers.size(); i++) {
+#if RETRO_USING_SDL2
+        if (controllers[i].devicePtr)
+            SDL_GameControllerClose(controllers[i].devicePtr);
+        if (controllers[i].hapticPtr)
+            SDL_HapticClose(controllers[i].hapticPtr);
+#endif
     }
+    controllers.clear();
 }
 
 void ProcessInput()
@@ -412,7 +391,7 @@ void ProcessInput()
     }
 
 #ifdef RETRO_USING_MOUSE
-    if (touches <= 0) {
+    if (touches <= 0) { // Touch always takes priority over mouse
         int mx = 0, my = 0;
         SDL_GetMouseState(&mx, &my);
 
@@ -505,67 +484,79 @@ void ProcessInput()
 }
 #endif //! !RETRO_USE_ORIGINAL_CODE
 
-void CheckKeyPress(InputData *input, byte flags)
+// Pretty much is this code in the original, just formatted differently
+void CheckKeyPress(InputData *input)
 {
-    if (flags & 0x1)
-        input->up = inputDevice[INPUT_UP].press;
-    if (flags & 0x2)
-        input->down = inputDevice[INPUT_DOWN].press;
-    if (flags & 0x4)
-        input->left = inputDevice[INPUT_LEFT].press;
-    if (flags & 0x8)
-        input->right = inputDevice[INPUT_RIGHT].press;
-    if (flags & 0x10)
-        input->A = inputDevice[INPUT_BUTTONA].press;
-    if (flags & 0x20)
-        input->B = inputDevice[INPUT_BUTTONB].press;
-    if (flags & 0x40)
-        input->C = inputDevice[INPUT_BUTTONC].press;
-    if (flags & 0x80)
-        input->start = inputDevice[INPUT_START].press;
-    if (flags & 0x80) {
-        anyPress = inputDevice[INPUT_ANY].press;
-        if (!anyPress) {
-            for (int t = 0; t < touches; ++t) {
-                if (touchDown[t])
-                    anyPress = true;
-            }
-        }
-
-        SetGlobalVariableByName("input.pressButton", anyPress);
-    }
+#if !RETRO_USE_ORIGINAL_CODE
+    input->up     = inputDevice[INPUT_UP].press;
+    input->down   = inputDevice[INPUT_DOWN].press;
+    input->left   = inputDevice[INPUT_LEFT].press;
+    input->right  = inputDevice[INPUT_RIGHT].press;
+    input->A      = inputDevice[INPUT_BUTTONA].press;
+    input->B      = inputDevice[INPUT_BUTTONB].press;
+    input->C      = inputDevice[INPUT_BUTTONC].press;
+    input->X      = inputDevice[INPUT_BUTTONX].press;
+    input->Y      = inputDevice[INPUT_BUTTONY].press;
+    input->Z      = inputDevice[INPUT_BUTTONZ].press;
+    input->L      = inputDevice[INPUT_BUTTONL].press;
+    input->R      = inputDevice[INPUT_BUTTONR].press;
+    input->start  = inputDevice[INPUT_START].press;
+    input->select = inputDevice[INPUT_SELECT].press;
+#endif
 }
 
-void CheckKeyDown(InputData *input, byte flags)
+void CheckKeyDown(InputData *input)
 {
-    if (flags & 0x1)
-        input->up = inputDevice[INPUT_UP].hold;
-    if (flags & 0x2)
-        input->down = inputDevice[INPUT_DOWN].hold;
-    if (flags & 0x4)
-        input->left = inputDevice[INPUT_LEFT].hold;
-    if (flags & 0x8)
-        input->right = inputDevice[INPUT_RIGHT].hold;
-    if (flags & 0x10)
-        input->A = inputDevice[INPUT_BUTTONA].hold;
-    if (flags & 0x20)
-        input->B = inputDevice[INPUT_BUTTONB].hold;
-    if (flags & 0x40)
-        input->C = inputDevice[INPUT_BUTTONC].hold;
-    if (flags & 0x80)
-        input->start = inputDevice[INPUT_START].hold;
+#if !RETRO_USE_ORIGINAL_CODE
+    input->up     = inputDevice[INPUT_UP].hold;
+    input->down   = inputDevice[INPUT_DOWN].hold;
+    input->left   = inputDevice[INPUT_LEFT].hold;
+    input->right  = inputDevice[INPUT_RIGHT].hold;
+    input->A      = inputDevice[INPUT_BUTTONA].hold;
+    input->B      = inputDevice[INPUT_BUTTONB].hold;
+    input->C      = inputDevice[INPUT_BUTTONC].hold;
+    input->X      = inputDevice[INPUT_BUTTONX].hold;
+    input->Y      = inputDevice[INPUT_BUTTONY].hold;
+    input->Z      = inputDevice[INPUT_BUTTONZ].hold;
+    input->L      = inputDevice[INPUT_BUTTONL].hold;
+    input->R      = inputDevice[INPUT_BUTTONR].hold;
+    input->start  = inputDevice[INPUT_START].hold;
+    input->select = inputDevice[INPUT_SELECT].hold;
+#endif
+}
+
+int CheckTouchRect(float x, float y, float w, float h)
+{
+    for (int f = 0; f < touches; ++f) {
+        if (touchDown[f] && touchXF[f] > (x - w) && touchYF[f] > (y - h) && touchXF[f] <= (x + w) && touchYF[f] <= (y + h)) {
+            return f;
+        }
+    }
+    return -1;
+}
+
+int CheckTouchRectMatrix(void *m, float x, float y, float w, float h)
+{
+    MatrixF *mat = (MatrixF *)m;
+    for (int f = 0; f < touches; ++f) {
+        float tx = touchXF[f];
+        float ty = touchYF[f];
+        if (touchDown[f]) {
+            float posX = (((tx * mat->values[0][0]) + (ty * mat->values[1][0])) + (mat->values[2][0] * SCREEN_YSIZE)) + mat->values[3][0];
+            if (posX > (x - w) && posX <= (x + w)) {
+                float posY = (((tx * mat->values[0][1]) + (ty * mat->values[1][1])) + (mat->values[2][1] * SCREEN_YSIZE)) + mat->values[3][1];
+                if (posY > (y - h) && posY <= (y + h))
+                    return f;
+            }
+        }
+    }
+    return -1;
 }
 
 #if RETRO_USE_HAPTICS
-void QueueHapticEffect(int hapticID)
+void HapticEffect(int *hapticID, int *a2, int *a3, int *a4)
 {
-    if (Engine.hapticsEnabled) {
-        // Haptic ID seems to be the ID for "Universal Haptic Layer"'s haptic effect library
-        hapticEffectNum = hapticID;
-    }
+    if (Engine.hapticsEnabled)
+        hapticEffectNum = *hapticID;
 }
-
-void PlayHaptics(int left, int right, int power) {}
-void PlayHapticsID(int hapticID) {}
-void StopHaptics(int hapticID) {}
 #endif
